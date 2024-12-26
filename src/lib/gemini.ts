@@ -1,12 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const genai = new GoogleGenerativeAI(process.env.GEMENI_API_KEY!)
+const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 const model = genai.getGenerativeModel({
     model: 'gemini-1.5-flash'
 })
 
 export const aiSummariseCommit = async (diff: string) => {
     //https://github.com/docker/genai-stack/commit/<commitHash>.diff
+
+    // console.log("Executing.....", diff);
 
     const response = await model.generateContent([
         `
@@ -41,6 +43,7 @@ It is given only as an example of approproate comments. `,
         `Please summarise the following diff file: \n\n${diff}`,
         
     ]);
+    // console.log("Gemini Response", response);
 
     return response.response.text();
 }
