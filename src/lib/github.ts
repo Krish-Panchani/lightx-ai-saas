@@ -9,7 +9,7 @@ export const octokit = new Octokit({
 const githubUrl = 'https://github.com/Krish-Panchani/lightx-ai-saas'
 
 type Response = {
-    commitHashes: string;
+    commitHash: string;
     commitMessage: string
     commitAuthorName: string
     commitAuthorAvatar: string
@@ -46,21 +46,22 @@ export const pollCommits = async (projectId: string) => {
     const commitHashes = await getCommitHashes(githubUrl)
     const unprosessedCommits = await filterUnprocessedCommits(projectId, commitHashes)
     const summaryResponses = await Promise.allSettled(unprosessedCommits.map(commit => {
-        return summariseCommit(githubUrl, commit.commitHashes)
+        return summariseCommit(githubUrl, commit.commitHash)
     }))
 
     const summaries = summaryResponses.map((response) => {
         if(response.status === 'fulfilled') {
             return response.value as string
         }
-        return ""
+        return "Error from AI while summarising commit"
     })
 
     const commit = await db.commit.createMany({
         data: summaries.map((summary, index) => {
+            console.log(`Processing Commit ${index}`)
             return {
                 projectId: projectId,
-                commitHash: unprosessedCommits[index]!.commitHashes,
+                commitHash: unprosessedCommits[index]!.commitHash,
                 commitMessage: unprosessedCommits[index]!.commitMessage,
                 commitAuthorName: unprosessedCommits[index]!.commitAuthorName,
                 commitAuthorAvatar: unprosessedCommits[index]!.commitAuthorAvatar,
@@ -69,16 +70,20 @@ export const pollCommits = async (projectId: string) => {
             }
         })
     })
-    return unprosessedCommits
+    return commit
 }
 
+// This function will return the summary of the commit with the given commit hash 
 async function summariseCommit(githubUrl: string, commitHash: string) {
     //get the diff, then pass the diff into ai
+    
+    // console.log(`Summarising commit ${commitHash}`) 
     const { data } = await axios.get(`${githubUrl}/commit/${commitHash}.diff`, {
         headers: {
             Accept: 'application/vnd.github.v3.diff'
         }
     });
+    console.log(data)
     return await aiSummariseCommit(data);
 
 }
@@ -101,7 +106,7 @@ async function filterUnprocessedCommits(projectId: string, commitHashes: Respons
     const processedCommits = await db.commit.findMany({
         where: { projectId }
     })
-    const unprosessedCommits = commitHashes.filter((commit) => !processedCommits.some((processedCommit) => processedCommit.commitHash === commit.commitHashes))
+    const unprosessedCommits = commitHashes.filter((commit) => !processedCommits.some((processedCommit) => processedCommit.commitHash === commit.commitHash))
     return unprosessedCommits
 }
 
